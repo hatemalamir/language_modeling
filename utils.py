@@ -1,6 +1,8 @@
 import re
 import random
 import time
+from collections import defaultdict
+import math
 import pandas as pd
 from bs4 import BeautifulSoup
 import nltk
@@ -11,6 +13,69 @@ nltk.download('punkt')
 STOPWORDS = stopwords.words('english')
 # Minimum frequency of a word to be included in the vocabulary
 MIN_FREQ = 40
+
+
+# Clean and tokenize
+def prep_sentence(
+    sentence, remove_special_chars=True, remove_stopwords=True,
+    replace_numbers='num', ignore_case=True
+):
+    if remove_special_chars:
+        # Remove special characters
+        sentence = re.sub('[^a-zA-Z1-9]', ' ', sentence)
+    if replace_numbers:
+        # Replace numbers with a token. Could be useful to limit the vocabulary
+        sentence = re.sub('\s\d+[\.*\d+]*', f' {replace_numbers} ', sentence)
+    if ignore_case:
+        # Case is not important most of the time
+        sentence = sentence.lower()
+    # Tokenize the sentence into words
+    words = sentence.split()
+    if remove_stopwords:
+        # Stopwords are not always useful
+        words = [w.lower() for w in words if w not in STOPWORDS]
+    return words
+
+
+def build_word2idx(
+    sentence_file, min_freq=0, num_words=None, return_sentence_words=False
+):
+    word_freq = defaultdict(int)
+    sent_words = []
+    with open(sentence_file, 'r') as sf:
+        print('>>> Building word frequncy table...')
+        start = time.time()
+        sent = sf.readline()
+        sent_count = 0
+        while sent:
+            sent_count += 1
+            words = prep_sentence(sent.strip())
+            if return_sentence_words and words:
+                sent_words.append(words)
+            for word in words:
+                word_freq[word] += 1
+            sent = sf.readline()
+        print(f'<<< Word frequency table ready! Took {round(time.time() - start, 3)} s')
+        print(f'Read {sent_count} sentences.')
+    # Sort word frequencies in descending order. Useful for negative sampling
+    # later on
+    start = time.time()
+    word_freq = {w: f for w, f in word_freq.items() if f >= min_freq}
+    word_freq = dict(sorted(word_freq.items(), key=lambda x: x[1], reverse=True))
+    # We could put frequency and rank in a tuple so that we do not end up with
+    # two dicts, but it would be cumbersome
+    print('>>> Building word-to-index table...')
+    word2idx = {}
+    for idx, word in enumerate(list(word_freq.keys())):
+        if num_words is not None and idx >= num_words:
+            break
+        word2idx[word] = idx
+    word2idx['oov'] = len(word2idx)
+    print(f'<<< {len(word2idx)} + 1 words indexed. Took {round(time.time() - start, 3)} s')
+    ret_vals = (word2idx, word_freq)
+    if return_sentence_words:
+        ret_vals += (sent_words,)
+    return ret_vals
 
 
 def load_datasets(names=[]):
@@ -175,3 +240,11 @@ def sentence_to_words(
     if remove_stopwords:
         words = [w.lower() for w in words if w not in STOPWORDS]
     return words
+
+
+def log_uniform_distribution(vocab_size):
+    probs = []
+    for rank in range(vocab_size):
+        # Equation from https://www.tensorflow.org/api_docs/python/tf/random/log_uniform_candidate_sampler
+        probs.append((math.log(rank + 2) - math.log(rank + 1)) / math.log(vocab_size + 1))
+    return probs

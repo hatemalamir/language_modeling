@@ -11,7 +11,7 @@ from tensorflow.keras import layers
 import tqdm
 
 FILE_DIR = os.path.dirname(__file__)
-INPUT_DIR = os.path.join(FILE_DIR, '../input/word2vec-nlp-tutorial')
+INPUT_DIR = os.path.join(FILE_DIR, '../data')
 
 
 BATCH_SIZE = 1024
