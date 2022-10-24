@@ -57,6 +57,7 @@ def rewrite_reviews_to_sentences(sentence_file):
             print(f'<<< Finished in {time.time() - start} seconds')
 
 
+# TODO try to find a more efficient way to generate negative samples
 def generate_samples(sentences, window_size, num_ns, word2idx, vocab_size):
     print('>>> Generating Word2Vec samples...')
     start = time.time()
